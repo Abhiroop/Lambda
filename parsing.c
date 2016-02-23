@@ -22,8 +22,50 @@ void add_history(char* unused){ }
 #include <editline/readline.h>
 #endif
 
-int main(int argc, char const *argv[])
-{
+/* Use operator string to see which operation to perform */
+long eval_op(long x, char* op, long y){
+
+	if(strcmp(op,"+")==0) { return x + y; }
+	if(strcmp(op,"-")==0) { return x - y; }
+	if(strcmp(op,"*")==0) { return x * y; }
+	if(strcmp(op,"/")==0) { return x / y; }
+	if(strcmp(op,"%")==0) { return x % y; }
+	if(strcmp(op,"^")==0) {  
+		int f=1;
+		for(int i=0 ; i < y; i++){
+			f=f*x;
+		}
+		return f;
+	}
+
+	return 0;
+}
+
+long eval(mpc_ast_t* t){
+
+	/* Base case for recursion */
+	if(strstr(t->tag,"number")){
+		return atoi(t->contents);
+	}
+
+	/* First child is always "(" so evaluate second child onwards */
+	char* op = t->children[1]->contents;
+
+	/* We store the third child in `x` */
+	long x = eval(t->children[2]);
+
+	/* Iterate the remaining children and combining. */
+	  int i = 3;
+	  while (strstr(t->children[i]->tag, "expr")) {
+	    x = eval_op(x, op, eval(t->children[i]));
+	    i++;
+	  }
+	  
+	  return x;   
+}
+
+int main(int argc, char const *argv[]){
+
 	/* Create Some Parsers */
 	mpc_parser_t* Number   = mpc_new("number");
 	mpc_parser_t* Operator = mpc_new("operator");
@@ -34,7 +76,7 @@ int main(int argc, char const *argv[])
 	mpca_lang(MPCA_LANG_DEFAULT,
 	  "                                                     \
 	    number   : /-?[0-9]+/ ;                             \
-	    operator : '+' | '-' | '*' | '/' ;                  \
+	    operator : '+' | '-' | '*' | '/'| '%'| '^'|;                  \
 	    expr     : <number> | '(' <operator> <expr>+ ')' ;  \
 	    lambda    : /^/ <operator> <expr>+ /$/ ;             \
 	  ",
@@ -52,7 +94,8 @@ int main(int argc, char const *argv[])
 		mpc_result_t r;
 		if(mpc_parse("<stdin>",input,Lambda,&r)){
 			/* On Success Print the AST */
-			  mpc_ast_print(r.output);
+			  long result = eval(r.output);
+      		  printf("%li\n", result);
 			  mpc_ast_delete(r.output);
 			} else {
 				/* Otherwise Print the Error */
